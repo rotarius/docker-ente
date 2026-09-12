@@ -1,7 +1,12 @@
 # Museum (Ente's API server) configuration.
 #
-# Copy this file to museum.yaml and fill in the placeholders. Keep
-# db.password in sync with POSTGRES_PASSWORD in .env.
+# Copy this file to museum.yaml and fill in the placeholders.
+#
+# Database is the shared Postgres instance from docker-postgis (service "db",
+# credentials from its docker-compose.yml). Create the "ente_db" database
+# there first:
+#   cd ../docker-postgis
+#   docker compose exec db psql -U docker -d gis -c "CREATE DATABASE ente_db;"
 #
 # Object storage is the shared MinIO instance from docker-minio, not a
 # container in this repo. Get s3.*.key / s3.*.secret from there (its
@@ -19,11 +24,13 @@
 # Reference: https://github.com/ente-io/ente/blob/main/server/configurations/local.yaml
 
 db:
-    host: postgres
+    host: db
     port: 5432
     name: ente_db
-    user: pguser
-    password: CHANGE_ME_SAME_AS_POSTGRES_PASSWORD
+    # These are docker-postgis's shared instance credentials (see its
+    # docker-compose.yml), not a secret specific to this app.
+    user: docker
+    password: docker
 
 s3:
     # docker-minio is reachable behind Traefik at s3.cloud-works.ch. Path-style
