@@ -42,10 +42,11 @@ Dieses Repo enthält selbst **keine** Datenbank und **keinen** Objektspeicher. B
 cp museum.yaml.example museum.yaml
 ```
 
-1. In `docker-postgis` die Datenbank für Ente anlegen:
+1. In `docker-postgis` eine eigene Rolle + Datenbank für Ente anlegen (analog zu `openproject`, nicht der geteilte Superuser):
    ```bash
    cd ../docker-postgis
-   docker compose exec db psql -U docker -d gis -c "CREATE DATABASE ente_db;"
+   docker compose exec db psql -U docker -d gis -c "CREATE ROLE ente_db WITH LOGIN PASSWORD '<password>';"
+   docker compose exec db psql -U docker -d gis -c "CREATE DATABASE ente_db OWNER ente_db;"
    ```
 2. In `docker-minio` drei Buckets für Ente anlegen (siehe dessen README):
    ```bash
@@ -54,12 +55,11 @@ cp museum.yaml.example museum.yaml
    docker exec -it minio mc mb local/ente-wasabi-eu-central-2-v3
    docker exec -it minio mc mb local/ente-scw-eu-fr-v3
    ```
-3. In `museum.yaml`: `s3.*.key` / `s3.*.secret` mit den MinIO-Credentials aus Schritt 2 füllen, und `key.encryption`, `key.hash`, `jwt.secret` mit zufälligen Werten:
+3. In `museum.yaml`: `db.password` mit dem Passwort aus Schritt 1, `s3.*.key` / `s3.*.secret` mit den MinIO-Credentials aus Schritt 2 füllen, und `key.encryption`, `key.hash`, `jwt.secret` mit zufälligen Werten:
    ```bash
    openssl rand -base64 32   # key.encryption, jwt.secret
    openssl rand -base64 64   # key.hash
    ```
-   (`db.*` ist bereits mit den docker-postgis-Standardwerten vorausgefüllt.)
 4. Starten:
    ```bash
    docker compose up -d
@@ -77,7 +77,7 @@ In den Ente-Mobile-Apps unter "Custom Server" `https://ente-api.cloud-works.ch` 
 
 Laut [offizieller Doku](https://github.com/ente-io/ente/blob/main/server/docs/quickstart.md#caveat) ist ein selbst gehostetes Setup für den Einstieg gedacht. Für ernsthaften Produktivbetrieb empfiehlt Ente, eine funktionierende Backup-Strategie zu haben, bevor eigene Fotos ausschließlich hier gespeichert werden.
 
-Die geteilte Nutzung von `docker-postgis` bedeutet außerdem: ein Neustart/eine Wartung dort (z.B. wegen eines anderen Dienstes) reißt kurzzeitig auch die Ente-DB-Verbindung mit runter, und die dortigen Zugangsdaten haben Zugriff auf alle Datenbanken der Instanz, nicht nur auf `ente_db`.
+Die geteilte Nutzung von `docker-postgis` bedeutet außerdem: ein Neustart/eine Wartung dort (z.B. wegen eines anderen Dienstes) reißt kurzzeitig auch die Ente-DB-Verbindung mit runter. Der DB-Zugriff selbst ist über die eigene Rolle `ente_db` auf die eigene Datenbank beschränkt (siehe [DATABASES.md](https://github.com/rotarius/docker-postgis/blob/develop/DATABASES.md)).
 
 ## Backup
 

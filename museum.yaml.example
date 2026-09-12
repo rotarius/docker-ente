@@ -2,11 +2,12 @@
 #
 # Copy this file to museum.yaml and fill in the placeholders.
 #
-# Database is the shared Postgres instance from docker-postgis (service "db",
-# credentials from its docker-compose.yml). Create the "ente_db" database
-# there first:
+# Database is the shared Postgres instance from docker-postgis (service
+# "db"). Create a scoped role + database for Ente there first (do not use
+# docker-postgis's shared superuser directly - see its DATABASES.md):
 #   cd ../docker-postgis
-#   docker compose exec db psql -U docker -d gis -c "CREATE DATABASE ente_db;"
+#   docker compose exec db psql -U docker -d gis -c "CREATE ROLE ente_db WITH LOGIN PASSWORD '<password>';"
+#   docker compose exec db psql -U docker -d gis -c "CREATE DATABASE ente_db OWNER ente_db;"
 #
 # Object storage is the shared MinIO instance from docker-minio, not a
 # container in this repo. Get s3.*.key / s3.*.secret from there (its
@@ -27,10 +28,9 @@ db:
     host: db
     port: 5432
     name: ente_db
-    # These are docker-postgis's shared instance credentials (see its
-    # docker-compose.yml), not a secret specific to this app.
-    user: docker
-    password: docker
+    # The scoped role created above, not docker-postgis's shared superuser.
+    user: ente_db
+    password: CHANGE_ME_SAME_AS_ROLE_PASSWORD_ABOVE
 
 s3:
     # docker-minio is reachable behind Traefik at s3.cloud-works.ch. Path-style
