@@ -48,14 +48,15 @@ cp museum.yaml.example museum.yaml
    docker compose exec db psql -U docker -d gis -c "CREATE ROLE ente_db WITH LOGIN PASSWORD '<password>';"
    docker compose exec db psql -U docker -d gis -c "CREATE DATABASE ente_db OWNER ente_db;"
    ```
-2. In `docker-minio` drei Buckets für Ente anlegen (siehe dessen README):
+2. In `docker-minio` drei Buckets sowie einen darauf beschränkten Access Key für Ente anlegen (kompletter Ablauf in dessen README, Abschnitt ["Buckets + Scoped Access Key für eine neue App anlegen"](https://github.com/rotarius/docker-minio#buckets--scoped-access-key-für-eine-neue-app-anlegen)):
    ```bash
    docker exec -it minio mc alias set local http://localhost:9000 <MINIO_ROOT_USER> <MINIO_ROOT_PASSWORD>
    docker exec -it minio mc mb local/ente-b2-eu-cen
    docker exec -it minio mc mb local/ente-wasabi-eu-central-2-v3
    docker exec -it minio mc mb local/ente-scw-eu-fr-v3
+   # ... Policy + Access Key wie in docker-minio's README beschrieben anlegen
    ```
-3. In `museum.yaml`: `db.password` mit dem Passwort aus Schritt 1, `s3.*.key` / `s3.*.secret` mit den MinIO-Credentials aus Schritt 2 füllen, und `key.encryption`, `key.hash`, `jwt.secret` mit zufälligen Werten:
+3. In `museum.yaml`: `db.password` mit dem Passwort aus Schritt 1, `s3.*.key` / `s3.*.secret` mit dem in Schritt 2 erzeugten Access Key/Secret (nicht die MinIO-Root-Credentials) füllen, und `key.encryption`, `key.hash`, `jwt.secret` mit zufälligen Werten:
    ```bash
    openssl rand -base64 32   # key.encryption, jwt.secret
    openssl rand -base64 64   # key.hash

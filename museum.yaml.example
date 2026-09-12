@@ -10,13 +10,16 @@
 #   docker compose exec db psql -U docker -d gis -c "CREATE DATABASE ente_db OWNER ente_db;"
 #
 # Object storage is the shared MinIO instance from docker-minio, not a
-# container in this repo. Get s3.*.key / s3.*.secret from there (its
-# MINIO_ROOT_USER / MINIO_ROOT_PASSWORD, unless you created a scoped access
-# key - see its README), and create the three buckets below on it first:
-#   docker exec -it minio mc alias set local http://localhost:9000 <user> <pass>
+# container in this repo. Create the three buckets and a scoped access key
+# for Ente there first (do not use docker-minio's root credentials directly -
+# see its README for the full "Buckets + Scoped Access Key" walkthrough):
+#   docker exec -it minio mc alias set local http://localhost:9000 <MINIO_ROOT_USER> <MINIO_ROOT_PASSWORD>
 #   docker exec -it minio mc mb local/ente-b2-eu-cen
 #   docker exec -it minio mc mb local/ente-wasabi-eu-central-2-v3
 #   docker exec -it minio mc mb local/ente-scw-eu-fr-v3
+#   # ... then create an "ente-policy" scoped to these three buckets and a
+#   # user with that policy attached, as described in docker-minio's README.
+# Use that user's access key / secret key below, not the MinIO root user.
 #
 # Generate key/hash/jwt secrets with, e.g.:
 #   openssl rand -base64 32   # key.encryption, jwt.secret
