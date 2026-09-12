@@ -18,42 +18,9 @@ services:
       retries: 5
       start_period: 40s
 
-  minio:
-    image: minio/minio
-    container_name: ente-minio
-    restart: unless-stopped
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    command: server /data --address ":3200" --console-address ":3201"
-    volumes:
-      - minio_data:/data
-    networks:
-      - internal
-      - traefik_network
-    # MinIO is reachable at ente-s3.cloud-works.ch so museum, the web app and
-    # mobile clients can all resolve presigned upload/download URLs directly.
-    labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=traefik_network"
-      - "traefik.http.routers.ente-s3.rule=Host(`ente-s3.cloud-works.ch`)"
-      - "traefik.http.routers.ente-s3.entrypoints=websecure"
-      - "traefik.http.routers.ente-s3.tls=true"
-      - "traefik.http.routers.ente-s3.tls.certresolver=myresolver"
-      - "traefik.http.routers.ente-s3.middlewares=secureHeaders@file"
-      - "traefik.http.services.ente-s3.loadbalancer.server.port=3200"
-    post_start:
-      - command: |
-          sh -c '
-          while ! mc alias set h0 http://localhost:3200 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" 2>/dev/null
-          do
-            echo "Waiting for minio..."
-            sleep 0.5
-          done
-          mc mb -p h0/b2-eu-cen
-          mc mb -p h0/wasabi-eu-central-2-v3
-          mc mb -p h0/scw-eu-fr-v3
-          '
+  # Object storage (S3) is provided by the shared MinIO instance in
+  # docker-minio, reachable as "minio:9000" on traefik_network / publicly at
+  # https://s3.cloud-works.ch - see museum.yaml.example and the README.
 
   museum:
     image: ghcr.io/ente/server:latest
@@ -119,4 +86,3 @@ networks:
 
 volumes:
   postgres_data:
-  minio_data:
