@@ -1,0 +1,122 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: ente-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pguser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-ente_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -q -d ${POSTGRES_DB:-ente_db} -U ${POSTGRES_USER:-pguser}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  minio:
+    image: minio/minio
+    container_name: ente-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    command: server /data --address ":3200" --console-address ":3201"
+    volumes:
+      - minio_data:/data
+    networks:
+      - internal
+      - traefik_network
+    # MinIO is reachable at ente-s3.cloud-works.ch so museum, the web app and
+    # mobile clients can all resolve presigned upload/download URLs directly.
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik_network"
+      - "traefik.http.routers.ente-s3.rule=Host(`ente-s3.cloud-works.ch`)"
+      - "traefik.http.routers.ente-s3.entrypoints=websecure"
+      - "traefik.http.routers.ente-s3.tls=true"
+      - "traefik.http.routers.ente-s3.tls.certresolver=myresolver"
+      - "traefik.http.routers.ente-s3.middlewares=secureHeaders@file"
+      - "traefik.http.services.ente-s3.loadbalancer.server.port=3200"
+    post_start:
+      - command: |
+          sh -c '
+          while ! mc alias set h0 http://localhost:3200 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" 2>/dev/null
+          do
+            echo "Waiting for minio..."
+            sleep 0.5
+          done
+          mc mb -p h0/b2-eu-cen
+          mc mb -p h0/wasabi-eu-central-2-v3
+          mc mb -p h0/scw-eu-fr-v3
+          '
+
+  museum:
+    image: ghcr.io/ente/server:latest
+    container_name: ente-museum
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./museum.yaml:/museum.yaml:ro
+    networks:
+      - internal
+      - traefik_network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/ping"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik_network"
+      - "traefik.http.routers.ente-api.rule=Host(`ente-api.cloud-works.ch`)"
+      - "traefik.http.routers.ente-api.entrypoints=websecure"
+      - "traefik.http.routers.ente-api.tls=true"
+      - "traefik.http.routers.ente-api.tls.certresolver=myresolver"
+      - "traefik.http.routers.ente-api.middlewares=secureHeaders@file"
+      - "traefik.http.services.ente-api.loadbalancer.server.port=8080"
+
+  web:
+    image: ghcr.io/ente/web:latest
+    container_name: ente-web
+    restart: unless-stopped
+    depends_on:
+      museum:
+        condition: service_healthy
+    environment:
+      ENTE_API_ORIGIN: https://ente-api.cloud-works.ch
+    networks:
+      - traefik_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik_network"
+      # Photos web app
+      - "traefik.http.routers.ente.rule=Host(`ente.cloud-works.ch`)"
+      - "traefik.http.routers.ente.entrypoints=websecure"
+      - "traefik.http.routers.ente.tls=true"
+      - "traefik.http.routers.ente.tls.certresolver=myresolver"
+      - "traefik.http.routers.ente.middlewares=secureHeaders@file"
+      - "traefik.http.services.ente.loadbalancer.server.port=3000"
+      # Public albums app
+      - "traefik.http.routers.ente-albums.rule=Host(`ente-albums.cloud-works.ch`)"
+      - "traefik.http.routers.ente-albums.entrypoints=websecure"
+      - "traefik.http.routers.ente-albums.tls=true"
+      - "traefik.http.routers.ente-albums.tls.certresolver=myresolver"
+      - "traefik.http.routers.ente-albums.middlewares=secureHeaders@file"
+      - "traefik.http.services.ente-albums.loadbalancer.server.port=3002"
+
+networks:
+  internal:
+  traefik_network:
+    external: true
+
+volumes:
+  postgres_data:
+  minio_data:
